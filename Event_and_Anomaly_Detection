@@ -1,0 +1,118 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import shap
+from lime.lime_tabular import LimeTabularExplainer
+
+
+file_path = "healthcare_event_anomaly_dataset.csv"  # Change this if needed
+df = pd.read_csv(file_path)
+
+for col in df.select_dtypes(include=np.number).columns:
+    df[col].fillna(df[col].mean(), inplace=True)
+
+for col in df.select_dtypes(include='object').columns:
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col])
+
+
+print("Dataset Sample:\n", df.head())
+print("\nClass Distribution:\n", df["Label"].value_counts())
+
+
+plt.figure(figsize=(6, 6))
+df["Label"].value_counts().plot.pie(
+    autopct="%1.1f%%", labels=["Normal", "Event", "Anomaly"], colors=["lightblue", "orange", "red"]
+)
+plt.title("Class Distribution of Events & Anomalies")
+plt.show()
+
+
+X = df.drop(columns=["Label"])
+y = df["Label"]
+
+
+scaler = MinMaxScaler()
+X_scaled = scaler.fit_transform(X)
+
+
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42, stratify=y)
+
+
+param_grid = {
+    'max_depth': range(3, 7),  # Reduced max depth for clarity
+    'min_samples_split': range(2, 10),
+    'min_samples_leaf': range(1, 5)
+}
+
+grid_search = GridSearchCV(DecisionTreeClassifier(random_state=42), param_grid, cv=5, scoring='accuracy')
+grid_search.fit(X_train, y_train)
+
+best_dt_model = grid_search.best_estimator_
+print("Best Hyperparameters:", grid_search.best_params_)
+
+
+y_pred_dt = best_dt_model.predict(X_test)
+print("\nDecision Tree Accuracy:", accuracy_score(y_test, y_pred_dt))
+print(classification_report(y_test, y_pred_dt))
+
+
+cm_dt = confusion_matrix(y_test, y_pred_dt)
+plt.figure(figsize=(6, 6))
+sns.heatmap(cm_dt, annot=True, fmt="d", cmap="Blues", xticklabels=["Normal", "Event", "Anomaly"], yticklabels=["Normal", "Event", "Anomaly"])
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Confusion Matrix (Decision Tree)")
+plt.show()
+
+plt.figure(figsize=(12, 6))  # Set smaller figure size
+plot_tree(
+    best_dt_model, 
+    feature_names=X.columns, 
+    class_names=[str(cls) for cls in y.unique()], 
+    filled=True, 
+    fontsize=10, 
+    max_depth=3 
+)
+plt.title("Decision Tree Visualization")
+plt.show()
+
+# SHAP Explanation
+explainer_dt = shap.TreeExplainer(best_dt_model)
+shap_values_dt = explainer_dt.shap_values(X_test)
+
+if isinstance(shap_values_dt, list):
+    for i in range(len(shap_values_dt)):
+        shap.summary_plot(shap_values_dt[i], X_test, feature_names=X.columns)
+else:
+    shap.summary_plot(shap_values_dt, X_test, feature_names=X.columns)
+
+np.random.seed(42)  
+explainer_lime_dt = LimeTabularExplainer(
+    X_train, 
+    training_labels=y_train, 
+    mode="classification", 
+    feature_names=X.columns, 
+    class_names=[str(cls) for cls in y.unique()], 
+    discretize_continuous=True,
+    random_state=42,  # Fix randomness
+    sample_around_instance=False,  # Ensures stability
+    kernel_width=0.75  # Control sensitivity
+)
+
+instance_index = 0  # Choose a single instance to explain
+lime_exp_dt = explainer_lime_dt.explain_instance(
+    X_test[instance_index], 
+    best_dt_model.predict_proba, 
+    num_features=10,
+    num_samples=500  # Fixed number of perturbations
+)
+
+lime_exp_dt.as_pyplot_figure()
+plt.title(f"LIME Explanation - Instance {instance_index}")
+plt.show()
