@@ -1,0 +1,167 @@
+import tkinter as tk
+from tkinter import messagebox
+
+# ---------- Data Classes ----------
+class Student:
+    def __init__(self, roll, name, dept, cgpa):
+        self.roll = roll
+        self.name = name
+        self.dept = dept
+        self.cgpa = cgpa
+        self.placed = False
+        self.company = None
+
+    def __str__(self):
+        status = f"Placed at {self.company}" if self.placed else "Not Placed"
+        return f"{self.roll} - {self.name} | {self.dept} | CGPA: {self.cgpa} | {status}"
+
+class Company:
+    def __init__(self, name, role, min_cgpa):
+        self.name = name
+        self.role = role
+        self.min_cgpa = min_cgpa
+        self.selected_students = []
+
+class PlacementSystem:
+    def __init__(self):
+        self.students = {}
+        self.companies = {}
+
+    def add_student(self, roll, name, dept, cgpa):
+        if roll in self.students:
+            return "Student already exists."
+        self.students[roll] = Student(roll, name, dept, cgpa)
+        return "Student added successfully."
+
+    def add_company(self, name, role, min_cgpa):
+        if name in self.companies:
+            return "Company already exists."
+        self.companies[name] = Company(name, role, min_cgpa)
+        return "Company added successfully."
+
+    def apply_student(self, roll, company_name):
+        student = self.students.get(roll)
+        company = self.companies.get(company_name)
+        if not student or not company:
+            return "Invalid student or company."
+
+        if student.placed:
+            return f"{student.name} already placed in {student.company}."
+        elif student.cgpa >= company.min_cgpa:
+            student.placed = True
+            student.company = company.name
+            company.selected_students.append(roll)
+            return f"{student.name} placed in {company.name}."
+        else:
+            return f"{student.name} not eligible for {company.name}."
+
+    def get_placed_students(self):
+        return [str(s) for s in self.students.values() if s.placed]
+
+
+# ---------- GUI Application ----------
+class PlacementApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("College Placement System")
+        self.root.geometry("600x500")
+        self.root.configure(bg="#f0f8ff")
+
+        self.system = PlacementSystem()
+
+        # Title
+        tk.Label(root, text="College Placement System", font=("Arial", 18, "bold"), bg="#f0f8ff", fg="#004080").pack(pady=10)
+
+        # Buttons
+        tk.Button(root, text="Add Student", width=25, bg="#d1e0e0", command=self.add_student_window).pack(pady=5)
+        tk.Button(root, text="Add Company", width=25, bg="#d1e0e0", command=self.add_company_window).pack(pady=5)
+        tk.Button(root, text="Apply Student to Company", width=25, bg="#d1e0e0", command=self.apply_window).pack(pady=5)
+        tk.Button(root, text="View Placed Students", width=25, bg="#d1e0e0", command=self.view_placed_students).pack(pady=5)
+        tk.Button(root, text="Exit", width=25, bg="#ff6666", command=root.quit).pack(pady=20)
+
+    def add_student_window(self):
+        win = tk.Toplevel(self.root)
+        win.title("Add Student")
+        win.geometry("300x300")
+        win.configure(bg="#e6f2ff")
+
+        tk.Label(win, text="Roll No:", bg="#e6f2ff").pack()
+        roll = tk.Entry(win)
+        roll.pack()
+
+        tk.Label(win, text="Name:", bg="#e6f2ff").pack()
+        name = tk.Entry(win)
+        name.pack()
+
+        tk.Label(win, text="Department:", bg="#e6f2ff").pack()
+        dept = tk.Entry(win)
+        dept.pack()
+
+        tk.Label(win, text="CGPA:", bg="#e6f2ff").pack()
+        cgpa = tk.Entry(win)
+        cgpa.pack()
+
+        def submit():
+            result = self.system.add_student(roll.get(), name.get(), dept.get(), float(cgpa.get()))
+            messagebox.showinfo("Status", result)
+            win.destroy()
+
+        tk.Button(win, text="Add", bg="#99ccff", command=submit).pack(pady=10)
+
+    def add_company_window(self):
+        win = tk.Toplevel(self.root)
+        win.title("Add Company")
+        win.geometry("300x250")
+        win.configure(bg="#e6ffe6")
+
+        tk.Label(win, text="Company Name:", bg="#e6ffe6").pack()
+        name = tk.Entry(win)
+        name.pack()
+
+        tk.Label(win, text="Role Offered:", bg="#e6ffe6").pack()
+        role = tk.Entry(win)
+        role.pack()
+
+        tk.Label(win, text="Min CGPA:", bg="#e6ffe6").pack()
+        min_cgpa = tk.Entry(win)
+        min_cgpa.pack()
+
+        def submit():
+            result = self.system.add_company(name.get(), role.get(), float(min_cgpa.get()))
+            messagebox.showinfo("Status", result)
+            win.destroy()
+
+        tk.Button(win, text="Add", bg="#66cc66", command=submit).pack(pady=10)
+
+    def apply_window(self):
+        win = tk.Toplevel(self.root)
+        win.title("Apply to Company")
+        win.geometry("300x200")
+        win.configure(bg="#fff0e6")
+
+        tk.Label(win, text="Student Roll No:", bg="#fff0e6").pack()
+        roll = tk.Entry(win)
+        roll.pack()
+
+        tk.Label(win, text="Company Name:", bg="#fff0e6").pack()
+        cname = tk.Entry(win)
+        cname.pack()
+
+        def submit():
+            result = self.system.apply_student(roll.get(), cname.get())
+            messagebox.showinfo("Status", result)
+            win.destroy()
+
+        tk.Button(win, text="Apply", bg="#ffcc99", command=submit).pack(pady=10)
+
+    def view_placed_students(self):
+        placed = self.system.get_placed_students()
+        msg = "\n".join(placed) if placed else "No students placed yet."
+        messagebox.showinfo("Placed Students", msg)
+
+
+# ---------- Main ----------
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = PlacementApp(root)
+    root.mainloop()
